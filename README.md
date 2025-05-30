@@ -8,5 +8,5 @@
 
 # 방식
 1. Socket 서버(라즈베리파이3B+) 구축
-2. ESP8266 NodeNCU를 활용한 릴레이 모듈 제어
+2. ESP8266 NodeMCU와 릴레이 모듈을 활용해 기존 개폐장치의 전자접촉기(Magnetic Connect)를 제어
 3. MIT APP Inventor로 안드로이드 APP을 만들어 서버와 연결
