@@ -4,6 +4,16 @@
     For example, on Linux you can use this command: nc -v -l 3000
 */
 
+/*
+HIGH 릴레이 멈춤
+LOW 릴레이 동작
+
+D0 : 왼 열
+D1 : 왼 닫
+D3 : 오 열
+D4 : 오 닫
+*/
+
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
 
@@ -11,13 +21,13 @@
 // #define DEBUG_Connect_Server
 // #define DEBUG_Connect_WiFi
 
-#define relay_1 D0
-#define relay_2 D1
-#define relay_3 D2
-#define relay_4 D3
+#define relay_1 D1
+#define relay_2 D2
+#define relay_3 D5
+#define relay_4 D6
 
 #ifndef STASSID
-#define STASSID "iptime"
+#define STASSID "smart_farm"
 #define STAPSK "123456789a!"
 #endif
 
@@ -29,14 +39,14 @@
 const char* ssid = STASSID;
 const char* password = STAPSK;
 
-const char* host = "192.168.0.8";
+const char* host = "chiyeong.asuscomm.com";
 const uint16_t port = 5555;
 
 volatile unsigned int cnt = 0;
 bool timerIsrFlag = false;
 bool relayStatusFlag = false;
 char sendBuf[CMD_SIZE];
-char getSensorId[10] = "CHI_SQL";
+
 
 Ticker flipper;
 WiFiClient client;
@@ -48,20 +58,21 @@ void socketEvent() {
   String statusStr;
 
   recvStr = client.readStringUntil('\n');
+
   #ifdef DEBUG_SocketEvent
     Serial.println(recvStr);
   #endif
   idStr = recvStr.substring(recvStr.indexOf("["), recvStr.indexOf("]") + 1);
   deviceStr = recvStr.substring(recvStr.indexOf("]") + 1, recvStr.indexOf("@"));
   statusStr = recvStr.substring(recvStr.indexOf("@") + 1, recvStr.length());
-  // #ifdef DEBUG_SocketEvent
-  //   Serial.print("idStr : ");
-  //   Serial.println(idStr);
-  //   Serial.print("deviceStr : ");
-  //   Serial.println(deviceStr);
-  //   Serial.print("statusStr : ");
-  //   Serial.println(statusStr);
-  // #endif
+  #ifdef DEBUG_SocketEvent
+    Serial.print("idStr : ");
+    Serial.println(idStr);
+    Serial.print("deviceStr : ");
+    Serial.println(deviceStr);
+    Serial.print("statusStr : ");
+    Serial.println(statusStr);
+  #endif
   if (deviceStr.startsWith(" New"))  // New Connected
   {
     Serial.write('\n');
@@ -73,35 +84,35 @@ void socketEvent() {
     server_Connect();
     return;
   }
-  else if (deviceStr == "RIGHT") {
+  else if (deviceStr == "LEFT") {
     if (statusStr == "OPEN"){
-      digitalWrite(relay_1, HIGH);
-      digitalWrite(relay_2, LOW);
-    }
-    else if (statusStr == "CLOSE") {
       digitalWrite(relay_1, LOW);
       digitalWrite(relay_2, HIGH);
     }
-    else if (statusStr == "STOP") {
-      digitalWrite(relay_1, LOW);
+    else if (statusStr == "CLOSE") {
+      digitalWrite(relay_1, HIGH);
       digitalWrite(relay_2, LOW);
+    }
+    else if (statusStr == "STOP") {
+      digitalWrite(relay_1, HIGH);
+      digitalWrite(relay_2, HIGH);
     }
     relayStatusFlag = true;
     recvStr.concat("\n");
     recvStr.toCharArray(sendBuf, CMD_SIZE);
   }
-  else if(deviceStr == "LEFT"){
+  else if(deviceStr == "RIGHT"){
     if (statusStr == "OPEN"){
-      digitalWrite(relay_3, HIGH);
-      digitalWrite(relay_4, LOW);
+      digitalWrite(relay_3, LOW);
+      digitalWrite(relay_4, HIGH);
     }
     else if (statusStr == "CLOSE") {
-      digitalWrite(relay_3, LOW);
       digitalWrite(relay_3, HIGH);
+      digitalWrite(relay_4, LOW);
     }
     else if (statusStr == "STOP") {
-      digitalWrite(relay_3, LOW);
-      digitalWrite(relay_4, LOW);
+      digitalWrite(relay_3, HIGH);
+      digitalWrite(relay_4, HIGH);
     }
     relayStatusFlag = true;
     recvStr.concat("\n");
@@ -109,22 +120,22 @@ void socketEvent() {
   }
   else if(deviceStr == "ALL"){
     if (statusStr == "OPEN"){
+      digitalWrite(relay_1, LOW);
+      digitalWrite(relay_2, HIGH);
+      digitalWrite(relay_3, LOW);
+      digitalWrite(relay_4, HIGH);
+    }
+    else if (statusStr == "CLOSE") {
       digitalWrite(relay_1, HIGH);
       digitalWrite(relay_2, LOW);
       digitalWrite(relay_3, HIGH);
       digitalWrite(relay_4, LOW);
     }
-    else if (statusStr == "CLOSE") {
-      digitalWrite(relay_1, LOW);
-      digitalWrite(relay_2, HIGH);
-      digitalWrite(relay_3, LOW);
-      digitalWrite(relay_3, HIGH);
-    }
     else if (statusStr == "STOP") {
-      digitalWrite(relay_1, LOW);
-      digitalWrite(relay_2, LOW);
-      digitalWrite(relay_3, LOW);
-      digitalWrite(relay_3, LOW);
+      digitalWrite(relay_1, HIGH);
+      digitalWrite(relay_2, HIGH);
+      digitalWrite(relay_3, HIGH);
+      digitalWrite(relay_4, HIGH);
     }
     relayStatusFlag = true;
     recvStr.concat("\n");
@@ -132,10 +143,10 @@ void socketEvent() {
   }
 
   client.write(sendBuf, strlen(sendBuf));
-  // #ifdef DEBUG_SocketEvent
-  //   Serial.print(", send : ");
-  //   Serial.print(sendBuf);
-  // #endif
+  #ifdef DEBUG_SocketEvent
+    Serial.print(", send : ");
+    Serial.print(sendBuf);
+  #endif
   memset(sendBuf, 0, sizeof(sendBuf));
   client.flush();
 }
@@ -170,7 +181,7 @@ void server_Connect() {
     #ifdef DEBUG_Connect_Server
       Serial.println("Connected to server");
     #endif
-    client.print("[" LOGID ":" PASSWD "]");
+    client.print(LOGID ":" PASSWD);
   } else {
     #ifdef DEBUG_Connect_Server
       Serial.println("server connection failure");
@@ -182,6 +193,11 @@ void pin_init() {
   pinMode(relay_2, OUTPUT);
   pinMode(relay_3, OUTPUT);
   pinMode(relay_4, OUTPUT);
+
+  digitalWrite(relay_1, HIGH);
+  digitalWrite(relay_2, HIGH);
+  digitalWrite(relay_3, HIGH);
+  digitalWrite(relay_4, HIGH);
 }
 void flip() {
   timerIsrFlag = true;
@@ -197,22 +213,26 @@ void setup() {
   flipper.attach(1, flip);
 }
 void loop() {
+
   if (client.available()) {
     socketEvent();
   }
+
   if (timerIsrFlag) {
     timerIsrFlag = false;
-    if (!(cnt % 5)) {
+
+    if(cnt % 5)    {
       if (!client.connected()) {
         server_Connect();
       }
     }
+
     if(!(cnt % 600)){
       if(relayStatusFlag){
-        digitalWrite(relay_1, LOW);
-        digitalWrite(relay_2, LOW);
-        digitalWrite(relay_3, LOW);
-        digitalWrite(relay_3, LOW);
+        digitalWrite(relay_1, HIGH);
+        digitalWrite(relay_2, HIGH);
+        digitalWrite(relay_3, HIGH);
+        digitalWrite(relay_4, HIGH);
         // Serial.print("relay all off");
         relayStatusFlag = false;
       }
