@@ -8,10 +8,11 @@
 HIGH 릴레이 멈춤
 LOW 릴레이 동작
 
-D0 : 왼 열
-D1 : 왼 닫
-D3 : 오 열
-D4 : 오 닫
+#define relay_1 D1 왼 열
+#define relay_2 D2 왼 닫
+#define relay_3 D5 오 열
+#define relay_4 D6 오 닫
+
 */
 
 #include <ESP8266WiFi.h>
